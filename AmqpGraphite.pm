@@ -6,6 +6,7 @@ use Collectd qw( :all );
 use threads::shared;
 use Net::RabbitMQ;
 
+
 =head1 NAME
 
 Collectd::Plugins::AmqpGraphite - Send collectd metrics to AMQP in graphite format, based on Collectd::Plugins::Graphite by Joe Miller
@@ -107,10 +108,10 @@ sub amqp_graphite_write {
     {
       lock($buff);
       for (my $i = 0; $i < scalar (@$ds); ++$i) {
-          my $graphite_path = sprintf "%s.%s.%d.%s.%s",
+          my $graphite_path = sprintf "%s.%s.%s.%s.%s",
               $plugin_str,
               $type_str,
-	      $i,
+	      $ds->[$i]->{'name'},
               $prefix,
               $host;
             
