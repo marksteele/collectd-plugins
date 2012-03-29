@@ -91,6 +91,7 @@ sub amqp_graphite_config {
 
 sub amqp_graphite_write {
     my ($type, $ds, $vl) = @_;
+
     my $host = $vl->{'host'};
     $host =~ s/\./_/g;
     my $plugin_str = $vl->{'plugin'};
@@ -106,9 +107,10 @@ sub amqp_graphite_write {
     {
       lock($buff);
       for (my $i = 0; $i < scalar (@$ds); ++$i) {
-          my $graphite_path = sprintf "%s.%s.%s.%s",
+          my $graphite_path = sprintf "%s.%s.%d.%s.%s",
               $plugin_str,
               $type_str,
+	      $i,
               $prefix,
               $host;
             
