@@ -1,1 +1,3 @@
-AmqpGraphite collectd perl plugin
+AmqpGraphite collectd perl plugin: Writes to AMQP with metrics in graphite format.
+
+AmqpJson collectd perl plugin: Writes to AMQP with metrics in json format.
