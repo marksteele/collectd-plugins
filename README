@@ -1,3 +1,9 @@
 AmqpGraphite collectd perl plugin: Writes to AMQP with metrics in graphite format.
 
 AmqpJson collectd perl plugin: Writes to AMQP with metrics in json format.
+
+TODO: 
+
+Add a protocol buffers implementation
+
+Add a UDP rabbitmq exchange version for fire and forget.
