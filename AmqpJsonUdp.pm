@@ -118,8 +118,8 @@ sub send_to_amqp {
      # Best effort to send
      lock($buff);
      return 0 if !length($buff);
-     my $sock = IO::Socket::INET->new(Proto => 'udp',PeerPort => $port,PeerAddr => $host);
-     $sock->send($buff);
+     my $sock = IO::Socket::INET->new(Proto => 'udp',PeerPort => $port,PeerAddr => $host) or plugin_log(LOG_ERR, "AmqpJsonUdp.pm: Unable to connect to udp socket $host:$port");
+     $sock->send($buff) or plugin_log(LOG_ERR, "AmqpJsonUdp.pm: Unable to send data");
      $buff = '';
      return 1;
 }
