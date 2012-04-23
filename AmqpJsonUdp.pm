@@ -68,14 +68,6 @@ sub amqp_json_config {
             $host = $val;
         } elsif ($key eq 'port') {
             $port = $val;
-        } elsif ($key eq 'user') {
-            $user = $val;
-        } elsif ($key eq 'password') {
-            $password = $val;
-        } elsif ($key eq 'exchange') {
-            $exchange = $val;
-        } elsif ($key eq 'vhost') {
-            $vhost = $val;
         }
     }
 
