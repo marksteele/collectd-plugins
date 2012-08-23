@@ -2,7 +2,6 @@ AmqpGraphite collectd perl plugin: Writes to AMQP with metrics in graphite forma
 
 AmqpJson collectd perl plugin: Writes to AMQP with metrics in json format.
 
-TODO: 
+CPUSUmmary perl plugin: A CPU summary plugin that takes into account number of CPUs to give a percentage utilization for each metric
 
-Add a protocol buffers implementation
-
+HTTPCheck perl plugin: An http check that can either use a simple regular expression match or can parse a json document and compare a key to an expected value.
