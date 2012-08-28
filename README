@@ -5,3 +5,25 @@ AmqpJson collectd perl plugin: Writes to AMQP with metrics in json format.
 CPUSUmmary perl plugin: A CPU summary plugin that takes into account number of CPUs to give a percentage utilization for each metric
 
 HTTPCheck perl plugin: An http check that can either use a simple regular expression match or can parse a json document and compare a key to an expected value.
+
+---
+
+RabbitMQ
+
+A module to monitor RabbitMQ AMQP broker message queues and message rates. The following metrics are pulled on a per-vhost/queue basis
+ - messages
+ - messages_rate
+ - messages_unacknolwedged
+ - messages_unacknolwedged_rate
+ - messages_ready
+ - message_ready_rate
+ - memory
+ - consumers
+ - publish
+ - publish_rate
+ - deliver_no_ack
+ - deliver_no_ack_rate
+ - deliver_get
+ - deliver_get_rate
+
+Refer to the RabbitMQ documentation for details on the meanings of these metrics.
