@@ -94,28 +94,22 @@ sub amqp_json_write {
     my ($type, $ds, $vl) = @_;
     my $host = $vl->{'host'};
     $host =~ s/\./_/g;
-    my $plugin_str = $vl->{'plugin'};
-    my $type_str   = $vl->{'type'};   
+    my $hashtemplate = {};
+    $hashtemplate->{'plugin'} = $vl->{'plugin'};
+    $hashtemplate->{'type'}  = $vl->{'type'};   
     if ( defined $vl->{'plugin_instance'} ) {
-        $plugin_str .=  "-" . $vl->{'plugin_instance'};
+        $hashtemplate->{'plugin_instance'} = $vl->{'plugin_instance'};
     }
     if ( defined $vl->{'type_instance'} ) {
-        $type_str .= "-" . $vl->{'type_instance'};
+        $hashtemplate->{'type_instance'} = $vl->{'type_instance'};
     }
 
     my $bufflen;
     {
       lock($buff);
       for (my $i = 0; $i < scalar (@$ds); ++$i) {
-          my $metric = sprintf "%s.%s.%s",
-              $plugin_str,
-              $type_str,
-	      $ds->[$i]->{'name'};
-          # convert any spaces that may have snuck in
-          $metric =~ s/\s+/_/g;
-          my $hashref = {};
-          $hashref->{'type'} = 'metric';
-          $hashref->{'metric'} = $metric;
+          my $hashref = $hashtemplate;
+          $hashref->{'name'} = $ds->[$i]->{'name'};
           $hashref->{'value'} = $vl->{'values'}->[$i];
           $hashref->{'time'} = $vl->{'time'};
           $hashref->{'datacenter'} = $prefix;
