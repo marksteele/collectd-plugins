@@ -193,7 +193,7 @@ sub my_read
   $vl->{'plugin'} = 'riak';
   $vl->{'type'} = 'riak';
   foreach my $field (@fields) {
-    $vl->{'values'}[] = $ref->{$field} ? $ref->{$field} : 0;
+    push(@{$vl->{'values'}}, define($ref->{$field}) ? $ref->{$field} : 0);
   }
   plugin_dispatch_values($vl);
   return 1;
