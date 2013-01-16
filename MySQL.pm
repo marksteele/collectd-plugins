@@ -1,54 +1,29 @@
-AmqpGraphite collectd perl plugin: Writes to AMQP with metrics in graphite format.
+package Collectd::Plugin::MySQL;
+use Collectd qw(:all);
+use DBD::mysql;
+require '/usr/lib/collectd/Collectd/Plugins/InnoDBParser.pm';
 
-AmqpJson collectd perl plugin: Writes to AMQP with metrics in json format.
+=head1 NAME
 
-CPUSUmmary perl plugin: A CPU summary plugin that takes into account number of CPUs to give a percentage utilization for each metric
+Collectd::Plugins::MySQL - Monitor a mysql server
 
-HTTPCheck perl plugin: An http check that can either use a simple regular expression match or can parse a json document and compare a key to an expected value.
+=head1 VERSION
 
----
+Version 1
 
-RabbitMQ
+=cut
 
-A module to monitor RabbitMQ AMQP broker message queues and message rates. The following metrics are pulled on a per-vhost/queue basis
- - messages
- - messages_rate
- - messages_unacknolwedged
- - messages_unacknolwedged_rate
- - messages_ready
- - message_ready_rate
- - memory
- - consumers
- - publish
- - publish_rate
- - deliver_no_ack
- - deliver_no_ack_rate
- - deliver_get
- - deliver_get_rate
-
-Refer to the RabbitMQ documentation for details on the meanings of these metrics.
-
-You'll need to add a new type to the collectd types db (/usr/share/collectd/types.db). The types.db.sample contains the relevant information to add. A quick way to do this is to do 
-  cat types.db.sample >>/usr/share/collectd/types.db
+our $VERSION = '1';
 
 
+=head1 SYNOPSIS
 
----
-
-Riak
-
-This plugin gathers statistics from the /stats REST endpoing. See the Riak documentation for the meanings of these variables. (http://docs.basho.com/riak/latest/cookbooks/Statistics-and-Monitoring/)
-
-
---
-
-MySQL
-
+This is a collectd plugin for monitoring a mysql server
 
 In your collectd config:
 
     <LoadPlugin "perl">
-        Globals true
+    	Globals true
     </LoadPlugin>
 
     <Plugin "perl">
@@ -63,11 +38,19 @@ In your collectd config:
       </Plugin>
     </Plugin>
 
+=head1 AUTHOR
 
-This plugin gathers about 500 metrics from the MySQL server. Specifically the following variables are gathered:
+Mark Steele, C<< <mark at control-alt-del.org> >>
+    
+=cut
 
-Server status:
+my $host = 'localhost';
+my $port = 3306;
+my $user = 'root';
+my $pass = '';
 
+my %keys = ();
+$keys{'status'} = [qw(
     aborted_clients aborted_connects binlog_cache_disk_use binlog_cache_use binlog_commits binlog_group_commits binlog_stmt_cache_disk_use binlog_stmt_cache_use bytes_received bytes_sent 
     com_admin_commands com_alter_db com_alter_db_upgrade com_alter_event com_alter_function com_alter_procedure com_alter_server com_alter_table com_alter_tablespace com_analyze com_assign_to_keycache 
     com_begin com_binlog com_call_procedure com_change_db com_change_master com_check com_checksum com_commit com_create_db com_create_event com_create_function com_create_index com_create_procedure 
@@ -108,28 +91,181 @@ Server status:
     ssl_ctx_verify_mode ssl_default_timeout ssl_finished_accepts ssl_finished_connects ssl_session_cache_hits ssl_session_cache_misses ssl_session_cache_mode ssl_session_cache_overflows 
     ssl_session_cache_size ssl_session_cache_timeouts ssl_sessions_reused ssl_used_session_cache_entries ssl_verify_depth ssl_verify_mode ssl_version table_locks_immediate table_locks_waited 
     tc_log_max_pages_used tc_log_page_size tc_log_page_waits threads_cached threads_connected threads_created threads_running uptime uptime_since_flush_status
+)]; 
 
-Slave status:
-
+$keys{'slave'} = [qw(
     exec_master_log_pos read_master_log_pos seconds_behind_master slave_io_running slave_sql_running
+)];
 
+$keys{'innodb'}{'bp'} = [qw(
+      add_pool_alloc awe_mem_alloc buf_free buf_pool_hit_rate buf_pool_hits buf_pool_reads buf_pool_size dict_mem_alloc page_creates_sec page_reads_sec page_writes_sec pages_created pages_modified 
+      pages_read pages_total pages_written reads_pending total_mem_alloc writes_pending writes_pending_flush_list writes_pending_lru writes_pending_single_page
+)]; 
 
-InnoDB status:
-
-    add_pool_alloc awe_mem_alloc buf_free buf_pool_hit_rate buf_pool_hits buf_pool_reads buf_pool_size dict_mem_alloc page_creates_sec page_reads_sec page_writes_sec pages_created pages_modified 
-    pages_read pages_total pages_written reads_pending total_mem_alloc writes_pending writes_pending_flush_list writes_pending_lru writes_pending_single_page
+$keys{'innodb'}{'ib'} = [qw(
     bufs_in_node_heap free_list_len hash_searches_s hash_table_size inserts merged_recs merges non_hash_searches_s seg_size size used_cells
+)]; 
+
+$keys{'innodb'}{'io'} = [qw(
     avg_bytes_s flush_type fsyncs_s os_file_reads os_file_writes os_fsyncs pending_aio_writes pending_buffer_pool_flushes pending_ibuf_aio_reads pending_log_flushes pending_log_ios 
     pending_normal_aio_reads pending_preads pending_pwrites pending_sync_ios reads_s writes_s
-    last_chkp log_flushed_to log_ios_done log_ios_s log_seq_no pending_chkp_writes pending_log_writes
-    del_sec ins_sec n_reserved_extents num_rows_del num_rows_ins num_rows_read num_rows_upd queries_in_queue queries_inside read_sec read_views_open upd_sec
-    mutex_os_waits mutex_spin_rounds mutex_spin_waits reservation_count rw_excl_os_waits rw_excl_spins rw_shared_os_waits rw_shared_spins signal_count wait_array_size
+)];
 
-Process states:
+$keys{'innodb'}{'lg'} = [qw(last_chkp log_flushed_to log_ios_done log_ios_s log_seq_no pending_chkp_writes pending_log_writes)];
+$keys{'innodb'}{'ro'} = [qw(del_sec ins_sec n_reserved_extents num_rows_del num_rows_ins num_rows_read num_rows_upd queries_in_queue queries_inside read_sec read_views_open upd_sec)];
+$keys{'innodb'}{'sm'} = [qw(mutex_os_waits mutex_spin_rounds mutex_spin_waits reservation_count rw_excl_os_waits rw_excl_spins rw_shared_os_waits rw_shared_spins signal_count wait_array_size)];
 
+
+$keys{'pstate'} = [qw(
   after_create analyzing checking_permissions checking_table cleaning_up closing_tables converting_heap_to_myisam copy_to_tmp_table copying_to_tmp_table_on_disk creating_index creating_sort_index
   copying_to_group_table creating_table creating_tmp_table deleting_from_main_table deleting_from_reference_table discard_or_import_tablespace end executing execution_of_init_command freeing_items
   flushing_tables fulltext_initiialization init killed locked logging_slow_query null manage_keys opening_table optimizing preparing purging_old_relay_logs query_end reading_from_net removing_duplicates
   removing_tmp_table rename rename_result_table reopen_tables repair_by_sorting repair_done repair_with_keycache rolling_back saving_state searching_rows_for_update sending_data setup sorting_for_group
   sorting_for_order sorting_index sorting_result statistics system_lock updating updating_main_table updating_reference_tables user_lock user_sleep waiting_for_table waiting_on_cond writing_to_net
+)];
+
+plugin_register (TYPE_READ, 'MySQL', 'my_read');
+plugin_register (TYPE_CONFIG, "MySQL", "mysql_config");
+
+sub mysql_config {
+  my ($ci) = @_;
+  foreach my $item (@{$ci->{'children'}}) {
+    my $key = lc($item->{'key'});
+    my $val = $item->{'values'}->[0];
+    if ($key eq 'host' ) {
+      $host = $val;
+     } elsif ($key eq 'port' ) {
+       $port = $val;
+     } elsif ($key eq 'user') {
+        $user = $val;
+     } elsif ($key eq 'pass') {
+         $pass = $val;
+     }
+  }
+  return 1;
+}
+
+sub my_read {
+  plugin_log(LOG_ERR, "MySQL: reading values");
+  my $dbh = DBI->connect("DBI:mysql:database=mysql;host=$host;port=$port", $user, $pass) || return 0;
+  my $status = $dbh->selectall_hashref("SHOW STATUS",'Variable_name');
+  my $slave = $dbh->selectrow_hashref("SHOW SLAVE STATUS");
+  $slave = {map { lc($_) => $slave->{$_}} keys %{$slave}};
+  my $istatus = $dbh->selectrow_hashref("SHOW /*!50000 ENGINE*/ INNODB STATUS");
+  my $parser = InnoDBParser->new;
+  my $innodb_status = $parser->parse_status_text($istatus->{'Status'},0,);
+  my $plist = $dbh->selectall_arrayref("SHOW PROCESSLIST", { Slice => {}});
+  $dbh->disconnect();
+  plugin_log(LOG_ERR, "MySQL: Done reading, submitting values");
+
+  my %states;
+  foreach my $item (@{$plist}) {
+    if ($item->{'State'}) {
+      $item->{'State'} =~ s/^(?:Table lock|Waiting.*lock)$/locked/;
+      $item->{'State'} =~ s/^Opening tables/opening table/;
+      $item->{'State'} =~ s/^Waiting for tables/waiting_for_table/;
+      $item->{'State'} =~ s/^(.+?);.*/$1/;
+      $item->{'State'} =~ s/[^a-zA-Z0-9_]/_/g;
+      $states{lc($item->{'State'})}++;
+    } else {
+      $states{'null'}++;
+    }
+  }
+
+  for (@{$keys{'status'}}) {
+    my $vl = {};
+    $vl->{'plugin'} = 'mysql';
+    $vl->{'type'} = 'counter';
+    $vl->{'plugin_instance'} = 'status';
+    $vl->{'type_instance'} =  $_;
+    if (defined($status{$_})) {
+      if ($status{$_} =~ /\d+(?:\.\d+)?/) {
+        $vl->{'values'} = [ $status{$_} ];
+      } else {
+        if ($status{$_} =~ /(?:yes|on|enabled)/i) {
+          $vl->{'values'} = [ 1 ];
+        } else {
+          $vl->{'values'} = [ 0 ];
+        }
+      }
+    } else {
+      $vl->{'values'} = [ 0 ];
+    }
+    plugin_dispatch_values($vl);  
+  }
+
+  for (@{$keys{'slave'}}) {
+    my $vl = {};
+    $vl->{'plugin'} = 'mysql';
+    $vl->{'type'} = 'counter';
+    $vl->{'plugin_instance'} = 'slave';
+    $vl->{'type_instance'} =  $_;
+    if (defined($slave->{$_})) {
+      if ($slave->{$_} =~ /\d+(?:\.\d+)?/) {
+        $vl->{'values'} = [ $slave->{$_} ];
+      } else {
+        if ($slave->{$_} =~ /(?:yes|on|enabled)/i) {
+          $vl->{'values'} = [ $slave->{$_} ];
+        } else {
+          $vl->{'values'} = [ 0 ];
+        }
+      }
+    } else {
+       $vl->{'values'} = [ 0 ];
+    }
+    plugin_dispatch_values($vl);  
+  }
+
+  my $vl = {};
+  $vl->{'plugin'} = 'mysql';
+  $vl->{'type'} = 'counter';
+  $vl->{'plugin_instance'} = 'slave';
+  $vl->{'type_instance'} =  'binlog_synched_to_master';
+
+  if ($slave->{'Master_Log_File'} eq $slave->{'Relay_Master_Log_File'}) { ## Slave processing same binlog as master
+    $vl->{'values'} = [ 1 ];
+  } else {
+    $vl->{'values'} = [ 0 ];
+  }
+  plugin_dispatch_values($vl);  
+
+  foreach my $section (keys %{$keys{'innodb'}}) {
+    my $vl = {};
+    $vl->{'plugin'} = 'mysql';
+    $vl->{'type'} = 'counter';
+    $vl->{'plugin_instance'} = 'innodb';
+    foreach my $item (@{$keys{'innodb'}{$section}}) {
+      $vl->{'type_instance'} =  $section . '_' . $item;
+      if ($innodb_status->{'sections'}->{$section}->{$item} =~ /\d+(?:\.\d+)?/) {
+        $vl->{'values'} = [ $innodb_status->{'sections'}->{$section}->{$item} ];
+      } else {
+        if ($innodb_status->{'sections'}->{$section}->{$item} =~ /(?:yes|on|enabled)/i) {
+          $vl->{'values'} = [ 1 ];
+        } else {
+           $vl->{'values'} = [ 0 ];
+        }
+      }
+      plugin_dispatch_values($vl);  
+    }
+  }
+
+  foreach my $item (@{$keys{'pstate'}}) {
+    my $vl = {};
+    $vl->{'plugin'} = 'mysql';
+    $vl->{'type'} = 'counter';
+    $vl->{'plugin_instance'} = 'process';
+    $vl->{'type_instance'} =  $item;
+    if (defined($states{$item})) {
+      $vl->{'values'} = [ $states{$item} ];
+    } else {
+      $vl->{'values'} = [ 0 ];
+    }
+    plugin_dispatch_values($vl);  
+  }
+
+  plugin_log(LOG_ERR, "MySQL: finished submitting values");
+  return 1;
+}
+
+1;
 
