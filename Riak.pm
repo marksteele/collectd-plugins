@@ -1,4 +1,4 @@
-4package Collectd::Plugin::Riak;
+package Collectd::Plugin::Riak;
 use Collectd qw(:all);
 use LWP::UserAgent;
 use HTTP::Request::Common qw(GET);
