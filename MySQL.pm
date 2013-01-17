@@ -98,7 +98,7 @@ $keys{'slave'} = [qw(
 )];
 
 $keys{'innodb'}{'bp'} = [qw(
-      add_pool_alloc awe_mem_alloc buf_free buf_pool_hit_rate buf_pool_hits buf_pool_reads buf_pool_size dict_mem_alloc page_creates_sec page_reads_sec page_writes_sec pages_created pages_modified 
+      add_pool_alloc awe_mem_alloc buf_free buf_pool_hits buf_pool_reads buf_pool_size dict_mem_alloc page_creates_sec page_reads_sec page_writes_sec pages_created pages_modified 
       pages_read pages_total pages_written reads_pending total_mem_alloc writes_pending writes_pending_flush_list writes_pending_lru writes_pending_single_page
 )]; 
 
@@ -119,7 +119,7 @@ $keys{'innodb'}{'sm'} = [qw(mutex_os_waits mutex_spin_rounds mutex_spin_waits re
 $keys{'pstate'} = [qw(
   after_create analyzing checking_permissions checking_table cleaning_up closing_tables converting_heap_to_myisam copy_to_tmp_table copying_to_tmp_table_on_disk creating_index creating_sort_index
   copying_to_group_table creating_table creating_tmp_table deleting_from_main_table deleting_from_reference_table discard_or_import_tablespace end executing execution_of_init_command freeing_items
-  flushing_tables fulltext_initiialization init killed locked logging_slow_query null manage_keys opening_table optimizing preparing purging_old_relay_logs query_end reading_from_net removing_duplicates
+  flushing_tables fulltext_initialization init killed locked logging_slow_query null manage_keys opening_table optimizing preparing purging_old_relay_logs query_end reading_from_net removing_duplicates
   removing_tmp_table rename rename_result_table reopen_tables repair_by_sorting repair_done repair_with_keycache rolling_back saving_state searching_rows_for_update sending_data setup sorting_for_group
   sorting_for_order sorting_index sorting_result statistics system_lock updating updating_main_table updating_reference_tables user_lock user_sleep waiting_for_table waiting_on_cond writing_to_net
 )];
@@ -146,9 +146,10 @@ sub mysql_config {
 }
 
 sub my_read {
-  plugin_log(LOG_ERR, "MySQL: reading values");
+#  plugin_log(LOG_ERR, "MySQL: reading values");
   my $dbh = DBI->connect("DBI:mysql:database=mysql;host=$host;port=$port", $user, $pass) || return 0;
   my $status = $dbh->selectall_hashref("SHOW STATUS",'Variable_name');
+  $status = { map { lc($_) => $status->{$_}} keys %{$status}};
   my $slave = $dbh->selectrow_hashref("SHOW SLAVE STATUS");
   $slave = {map { lc($_) => $slave->{$_}} keys %{$slave}};
   my $istatus = $dbh->selectrow_hashref("SHOW /*!50000 ENGINE*/ INNODB STATUS");
@@ -156,7 +157,7 @@ sub my_read {
   my $innodb_status = $parser->parse_status_text($istatus->{'Status'},0,);
   my $plist = $dbh->selectall_arrayref("SHOW PROCESSLIST", { Slice => {}});
   $dbh->disconnect();
-  plugin_log(LOG_ERR, "MySQL: Done reading, submitting values");
+#  plugin_log(LOG_ERR, "MySQL: Done reading, submitting values");
 
   my %states;
   foreach my $item (@{$plist}) {
@@ -178,11 +179,11 @@ sub my_read {
     $vl->{'type'} = 'counter';
     $vl->{'plugin_instance'} = 'status';
     $vl->{'type_instance'} =  $_;
-    if (defined($status{$_})) {
-      if ($status{$_} =~ /\d+(?:\.\d+)?/) {
-        $vl->{'values'} = [ $status{$_} ];
+    if (defined($status->{$_}->{'Value'})) {
+      if ($status->{$_}->{'Value'} =~ /^\d+(\.\d+)?$/) {
+        $vl->{'values'} = [  $status->{$_}->{'Value'} + 0 ];
       } else {
-        if ($status{$_} =~ /(?:yes|on|enabled)/i) {
+        if ($status->{$_}->{'Value'} =~ /(?:yes|on|enabled)/i) {
           $vl->{'values'} = [ 1 ];
         } else {
           $vl->{'values'} = [ 0 ];
@@ -201,8 +202,8 @@ sub my_read {
     $vl->{'plugin_instance'} = 'slave';
     $vl->{'type_instance'} =  $_;
     if (defined($slave->{$_})) {
-      if ($slave->{$_} =~ /\d+(?:\.\d+)?/) {
-        $vl->{'values'} = [ $slave->{$_} ];
+      if ($slave->{$_} =~ /^\d+(?:\.\d+)?$/) {
+        $vl->{'values'} = [ $slave->{$_} + 0];
       } else {
         if ($slave->{$_} =~ /(?:yes|on|enabled)/i) {
           $vl->{'values'} = [ $slave->{$_} ];
@@ -236,8 +237,8 @@ sub my_read {
     $vl->{'plugin_instance'} = 'innodb';
     foreach my $item (@{$keys{'innodb'}{$section}}) {
       $vl->{'type_instance'} =  $section . '_' . $item;
-      if ($innodb_status->{'sections'}->{$section}->{$item} =~ /\d+(?:\.\d+)?/) {
-        $vl->{'values'} = [ $innodb_status->{'sections'}->{$section}->{$item} ];
+      if ($innodb_status->{'sections'}->{$section}->{$item} =~ /^\d+(?:\.\d+)?$/) {
+        $vl->{'values'} = [ $innodb_status->{'sections'}->{$section}->{$item} + 0];
       } else {
         if ($innodb_status->{'sections'}->{$section}->{$item} =~ /(?:yes|on|enabled)/i) {
           $vl->{'values'} = [ 1 ];
@@ -256,16 +257,17 @@ sub my_read {
     $vl->{'plugin_instance'} = 'process';
     $vl->{'type_instance'} =  $item;
     if (defined($states{$item})) {
-      $vl->{'values'} = [ $states{$item} ];
+      $vl->{'values'} = [ $states{$item} + 0];
     } else {
       $vl->{'values'} = [ 0 ];
     }
     plugin_dispatch_values($vl);  
   }
 
-  plugin_log(LOG_ERR, "MySQL: finished submitting values");
+#  plugin_log(LOG_ERR, "MySQL: finished submitting values");
   return 1;
 }
+
 
 1;
 
