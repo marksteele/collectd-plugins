@@ -1,8 +1,18 @@
 AmqpGraphite collectd perl plugin: Writes to AMQP with metrics in graphite format.
 
+--
+
 AmqpJson collectd perl plugin: Writes to AMQP with metrics in json format.
 
+--
+
+AmqpJsonUdp collectd perl plugin: Writes to AMQP with metrics in json format. Uses the UDP-exchange to bypass all the AMQP overhead and makes sending metrics fire-and-forget.
+
+--
+
 CPUSUmmary perl plugin: A CPU summary plugin that takes into account number of CPUs to give a percentage utilization for each metric
+
+--
 
 HTTPCheck perl plugin: An http check that can either use a simple regular expression match or can parse a json document and compare a key to an expected value.
 
@@ -30,8 +40,6 @@ Refer to the RabbitMQ documentation for details on the meanings of these metrics
 
 You'll need to add a new type to the collectd types db (/usr/share/collectd/types.db). The types.db.sample contains the relevant information to add. A quick way to do this is to do 
   cat types.db.sample >>/usr/share/collectd/types.db
-
-
 
 ---
 
