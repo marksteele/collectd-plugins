@@ -145,6 +145,58 @@ sub mysql_config {
   return 1;
 }
 
+# Support function. Reads and returns a single configuration value from MySQL itself.
+sub read_mysql_variable {
+  my ( $dbh, $varname ) = @_;
+  my $value = ( $dbh->selectrow_array( qq{SHOW /*!40003 GLOBAL*/ VARIABLES LIKE "\Q$varname\E"} ) )[1];
+  return $value;
+}
+
+# Support function. Reads and returns the PID of MySQL from a given filename.
+sub read_mysql_pid_from_file {
+  my $pid_file = shift;
+  open( my $fh, '<', $pid_file ) or die qq{Cannot open '$pid_file' for reading: $!};
+  my $pid = readline $fh;
+  close $fh or die qq{Cannot close '$pid_file' after reading: $!};
+  chomp $pid;
+  return $pid;
+}
+
+# Support function. Calculates and returns the name of the "innodb_status" file
+# from MySQL's configuration.
+sub innodb_status_filename {
+  my $dbh = shift;
+  my $mysql_datadir          = read_mysql_variable $dbh, 'datadir';
+  my $mysql_pidfile          = read_mysql_variable $dbh, 'pid_file';
+  my $mysql_pid              = read_mysql_pid_from_file $mysql_pidfile;
+  my $innodb_status_filename = qq{$mysql_datadir/innodb_status.$mysql_pid};
+  return $innodb_status_filename;
+}
+
+# Support function. Reads innodb status from either the dump-file
+# (${mysql::datadir}/innodb_status.${mysql::pid}) or
+# 'SHOW ENGINE INNODB STATUS'. It prefers the file to the SQL to
+# avoid the 64KB limitation on the SQL wherever possible.
+sub read_innodb_status_from_file_or_sql {
+  my $dbh                     = shift;
+  my $innodb_status_filename  = innodb_status_filename $dbh;
+  my $innodb_status_fulltext;
+  if( -r $innodb_status_filename ){
+    open my $fh, '<', $innodb_status_filename
+      or die qq{Cannot open innodb status file '$innodb_status_filename' for reading: $!};
+    $innodb_status_fulltext = do{ local $/ = undef; <$fh> };
+    close $fh
+      or die qq{CAnnot close innodb status file '$innodb_status_filename' after reading: $!};
+  } else {
+    $innodb_status_fulltext = ${ $dbh->selectrow_hashref( q{SHOW /*!50000 ENGINE*/ INNODB STATUS} ) }{Status};
+    # my @result = $dbh->selectrow_array( q{SHOW /*!50000 ENGINE*/ INNODB STATUS} );
+    # $innodb_status_fulltext = $result[1];
+  }
+
+  return $innodb_status_fulltext;
+}
+
+
 sub my_read {
 #  plugin_log(LOG_ERR, "MySQL: reading values");
   my $dbh = DBI->connect("DBI:mysql:database=mysql;host=$host;port=$port", $user, $pass) || return 0;
@@ -152,9 +204,8 @@ sub my_read {
   $status = { map { lc($_) => $status->{$_}} keys %{$status}};
   my $slave = $dbh->selectrow_hashref("SHOW SLAVE STATUS");
   $slave = {map { lc($_) => $slave->{$_}} keys %{$slave}};
-  my $istatus = $dbh->selectrow_hashref("SHOW /*!50000 ENGINE*/ INNODB STATUS");
   my $parser = InnoDBParser->new;
-  my $innodb_status = $parser->parse_status_text($istatus->{'Status'},0,);
+  my $innodb_status = $parser->parse_status_text(read_innodb_status_from_file_or_sql( $dbh ),0,);
   my $plist = $dbh->selectall_arrayref("SHOW PROCESSLIST", { Slice => {}});
   $dbh->disconnect();
 #  plugin_log(LOG_ERR, "MySQL: Done reading, submitting values");
