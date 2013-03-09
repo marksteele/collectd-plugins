@@ -141,3 +141,5 @@ Process states:
   removing_tmp_table rename rename_result_table reopen_tables repair_by_sorting repair_done repair_with_keycache rolling_back saving_state searching_rows_for_update sending_data setup sorting_for_group
   sorting_for_order sorting_index sorting_result statistics system_lock updating updating_main_table updating_reference_tables user_lock user_sleep waiting_for_table waiting_on_cond writing_to_net
 
+Reading InnoDB data from the status file is supported and will kick in automatically if the server supports it. See this URL for tunign it on:
+http://dev.mysql.com/doc/refman/5.1/en/innodb-parameters.html#option_mysqld_innodb-status-file
