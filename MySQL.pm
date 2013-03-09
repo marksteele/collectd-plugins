@@ -148,7 +148,7 @@ sub mysql_config {
 sub my_read {
 #  plugin_log(LOG_ERR, "MySQL: reading values");
   my $dbh = DBI->connect("DBI:mysql:database=mysql;host=$host;port=$port", $user, $pass) || return 0;
-  my $status = $dbh->selectall_hashref("SHOW STATUS",'Variable_name');
+  my $status = $dbh->selectall_hashref("SHOW /*!50002 GLOBAL */ STATUS",'Variable_name');
   $status = { map { lc($_) => $status->{$_}} keys %{$status}};
   my $slave = $dbh->selectrow_hashref("SHOW SLAVE STATUS");
   $slave = {map { lc($_) => $slave->{$_}} keys %{$slave}};
