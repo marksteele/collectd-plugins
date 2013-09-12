@@ -45,7 +45,7 @@ You'll need to add a new type to the collectd types db (/usr/share/collectd/type
 
 Riak
 
-This plugin gathers statistics from the /stats REST endpoing. See the Riak documentation for the meanings of these variables. (http://docs.basho.com/riak/latest/cookbooks/Statistics-and-Monitoring/)
+This plugin gathers statistics from the /stats REST endpoint. See the Riak documentation for the meanings of these variables. (http://docs.basho.com/riak/latest/cookbooks/Statistics-and-Monitoring/)
 
 
 --
