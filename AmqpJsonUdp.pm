@@ -6,10 +6,11 @@ use Collectd qw( :all );
 use threads::shared;
 use IO::Socket;
 use JSON;
+use Compress::Zlib;
 
 =head1 NAME
 
-Collectd::Plugins::AmqpJsonUdp - Send collectd metrics to AMQP in json format, based on Collectd::Plugins::Graphite by Joe Miller
+Collectd::Plugins::AmqpJsonUdp - Send collectd metrics to AMQP in json format to a UDP endpoint, based on Collectd::Plugins::Graphite by Joe Miller
 
 =head1 VERSION
 
@@ -39,6 +40,7 @@ In your collectd config:
     	  Prefix "datacenter"
     	  Host   "amqp.host"
     	  Port   "2003"
+          Compression "On"
     	</Plugin>
     </Plugin>
 
@@ -53,6 +55,8 @@ my $buffer_size = 8192;
 my $prefix;
 my $host = 'localhost';
 my $port = 5672;
+my $compress;
+my $event_type = 'CollectdMetric';
 
 sub amqp_json_config {
     my ($ci) = @_;
@@ -68,9 +72,12 @@ sub amqp_json_config {
             $host = $val;
         } elsif ($key eq 'port') {
             $port = $val;
+        } elsif ($key eq 'compression' && lc($val) eq 'on') {
+	   $compress = 1;
+        } elsif ($key eq 'eventtype') {
+	   $event_type = $val;
         }
     }
-
     return 1;
 }
 
@@ -98,6 +105,7 @@ sub amqp_json_write {
           $hashref->{'time'} = $vl->{'time'};
           $hashref->{'datacenter'} = $prefix;
           $hashref->{'host'} = $host;
+          $hashref->{'event_type'} = $event_type;
           $buff .= encode_json($hashref) . "\n";
       }
       $bufflen = length($buff);
@@ -110,10 +118,13 @@ sub amqp_json_write {
 
 sub send_to_amqp {
      # Best effort to send
+     # Note: if compression is enabled, we add the string 's' to the start of the compressed data. This is what 
+     # tools can use to automagically detect compressed metrics. This string should obviously be stripped
+     # before trying to decompress it.
      lock($buff);
      return 0 if !length($buff);
      my $sock = IO::Socket::INET->new(Proto => 'udp',PeerPort => $port,PeerAddr => $host) or plugin_log(LOG_ERR, "AmqpJsonUdp.pm: Unable to connect to udp socket $host:$port");
-     $sock->send($buff) or plugin_log(LOG_ERR, "AmqpJsonUdp.pm: Unable to send data");
+     $sock->send($compress ? compress($buff) : $buff) or plugin_log(LOG_ERR, "AmqpJsonUdp.pm: Unable to send data");
      $buff = '';
      return 1;
 }
