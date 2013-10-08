@@ -51,7 +51,22 @@ Mark Steele, C<< <mark at control-alt-del.org> >>, original author of graphite p
 =cut
 
 my $buff :shared;
-my $buffer_size = 8192;
+# Informal testing has shown that with compression on, a 32k buffer can compress down to about 2k
+# My recommendation is to have the buffer size at 1432 bytes if not using compression, and 
+# set it to 16k if compression is on (which compresses down to roughly 1k).
+# This is to accomodate the min MTU to avoid fragmentation on ethernet networks.
+#
+# On gigabit networks with jumbo frames on between hosts exchanging data, this value can be bumped
+# up quite a bit.
+#
+# Fragmentation in UDP is a recipe for lost data, so it's best avoided. Plus, these recommendations will
+# yield highest possible throughput by minimizing header overhead.
+#
+# Having compression on is highly advisable.
+#
+#
+
+my $buffer_size = 16384; 
 my $prefix;
 my $host = 'localhost';
 my $port = 5672;
@@ -118,13 +133,15 @@ sub amqp_json_write {
 
 sub send_to_amqp {
      # Best effort to send
-     # Note: if compression is enabled, we add the string 's' to the start of the compressed data. This is what 
-     # tools can use to automagically detect compressed metrics. This string should obviously be stripped
-     # before trying to decompress it.
      lock($buff);
      return 0 if !length($buff);
+     if ($compress) {
+       plugin_log(LOG_DEBUG,"Uncompressed: " . length($buff));
+       $buff = compress($buff, Z_BEST_COMPRESSION);
+       plugin_log(LOG_DEBUG,"Compressed: " . length($buff));
+     }
      my $sock = IO::Socket::INET->new(Proto => 'udp',PeerPort => $port,PeerAddr => $host) or plugin_log(LOG_ERR, "AmqpJsonUdp.pm: Unable to connect to udp socket $host:$port");
-     $sock->send($compress ? compress($buff) : $buff) or plugin_log(LOG_ERR, "AmqpJsonUdp.pm: Unable to send data");
+     $sock->send($buff) or plugin_log(LOG_ERR, "AmqpJsonUdp.pm: Unable to send data");
      $buff = '';
      return 1;
 }
