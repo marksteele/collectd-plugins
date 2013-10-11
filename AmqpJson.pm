@@ -6,6 +6,7 @@ use Collectd qw( :all );
 use threads::shared;
 use Net::RabbitMQ;
 use JSON;
+use Compress::Zlib;
 
 =head1 NAME
 
@@ -35,7 +36,7 @@ In your collectd config:
       LoadPlugin "AmqpJson"
 
     	<Plugin "AmqpJson">
-    	  Buffer "256000"
+    	  Buffer "65507"
     	  Prefix "datacenter"
     	  Host   "amqp.host"
     	  Port   "2003"
@@ -43,6 +44,7 @@ In your collectd config:
 	  Password "amqppass"
 	  Exchange "exchangename"
 	  VHost "/virtualhost"
+          Compression "On"
     	</Plugin>
     </Plugin>
 
@@ -61,6 +63,8 @@ my $user;
 my $password;
 my $exchange;
 my $vhost;
+my $compress;
+my $event_type = 'CollectdMetric';
 
 sub amqp_json_config {
     my ($ci) = @_;
@@ -84,11 +88,16 @@ sub amqp_json_config {
             $exchange = $val;
         } elsif ($key eq 'vhost') {
             $vhost = $val;
+        } elsif ($key eq 'compression' && lc($val) eq 'on') {
+	   $compress = 1;
+        } elsif ($key eq 'eventtype') {
+	   $event_type = $val;
         }
     }
 
     return 1;
 }
+
 
 sub amqp_json_write {
     my ($type, $ds, $vl) = @_;
@@ -96,7 +105,7 @@ sub amqp_json_write {
     $host =~ s/\./_/g;
     my $hashtemplate = {};
     $hashtemplate->{'plugin'} = $vl->{'plugin'};
-    $hashtemplate->{'type'}  = $vl->{'type'};   
+    $hashtemplate->{'type'}  = $vl->{'type'};
     if ( defined $vl->{'plugin_instance'} ) {
         $hashtemplate->{'plugin_instance'} = $vl->{'plugin_instance'};
     }
@@ -114,6 +123,7 @@ sub amqp_json_write {
           $hashref->{'time'} = $vl->{'time'};
           $hashref->{'datacenter'} = $prefix;
           $hashref->{'host'} = $host;
+          $hashref->{'event_type'} = $event_type;
           $buff .= encode_json($hashref) . "\n";
       }
       $bufflen = length($buff);
@@ -124,8 +134,8 @@ sub amqp_json_write {
     return 1;
 }
 
+
 sub send_to_amqp {
-     # Best effort to send
      lock($buff);
      return 0 if !length($buff);
      my $mq = Net::RabbitMQ->new();
@@ -134,7 +144,7 @@ sub send_to_amqp {
        eval {
          $mq->channel_open(1);
          $mq->exchange_declare(1, $exchange, { 'exchange_type' => 'topic', 'durable' => 1, 'auto_delete' => 0 });
-         $mq->publish(1, '', $buff, { exchange => $exchange });
+         $mq->publish(1, '', $compress ? compress($buff) : $buff, { exchange => $exchange });
          $mq->disconnect();
        };
        if ($@ ne '') {
