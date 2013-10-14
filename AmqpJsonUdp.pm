@@ -58,6 +58,8 @@ my $port = 5672;
 my $compress;
 my $event_type = 'CollectdMetric';
 
+## TODO: Consider optimizing compression a pre-built zlib dictionary
+
 sub amqp_json_config {
     my ($ci) = @_;
     foreach my $item (@{$ci->{'children'}}) {
