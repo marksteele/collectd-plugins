@@ -143,3 +143,5 @@ Process states:
 
 Reading InnoDB data from the status file is supported and will kick in automatically if the server supports it. See this URL for tunign it on:
 http://dev.mysql.com/doc/refman/5.1/en/innodb-parameters.html#option_mysqld_innodb-status-file
+
+DiskStats
