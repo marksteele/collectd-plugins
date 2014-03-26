@@ -1,7 +1,7 @@
 package Collectd::Plugin::MySQL;
 use Collectd qw(:all);
 use DBD::mysql;
-require '/usr/lib/collectd/Collectd/Plugins/InnoDBParser.pm';
+require InnoDBParser;
 
 =head1 NAME
 
