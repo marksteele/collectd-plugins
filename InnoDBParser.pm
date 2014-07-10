@@ -1,4 +1,23 @@
+use strict;
+use warnings FATAL => 'all';
+
 package InnoDBParser;
+
+# This program is copyright (c) 2006 Baron Schwartz, baron at xaprb dot com.
+# Feedback and improvements are gratefully received.
+#
+# THIS PROGRAM IS PROVIDED "AS IS" AND WITHOUT ANY EXPRESS OR IMPLIED
+# WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
+# MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+#
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, version 2; OR the Perl Artistic License.  On UNIX and similar
+# systems, you can issue `man perlgpl' or `man perlartistic' to read these
+
+# You should have received a copy of the GNU General Public License along with
+# this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+# Place, Suite 330, Boston, MA  02111-1307  USA
 
 use Data::Dumper;
 $Data::Dumper::Sortkeys = 1;
@@ -92,7 +111,7 @@ sub new {
 # to parse (hashref; if empty, parse all), and whether to parse full info from
 # locks and such (probably shouldn't unless you need to).
 sub parse_status_text {
-   my ( $self, $fulltext, $debug, $sections, $full ) = @_;
+   my ( $self, $fulltext, $debug, $sections, $full, $mysqlversion) = @_;
 
    die "I can't parse undef" unless defined $fulltext;
    $fulltext =~ s/[\r\n]+/\n/g;
@@ -114,8 +133,14 @@ sub parse_status_text {
    # Get the most basic info about the status: beginning and end, and whether
    # I got the whole thing (if there has been a big deadlock and there are
    # too many locks to print, the output might be truncated)
-   my ( $time_text ) = $fulltext =~ m/^$s INNODB MONITOR OUTPUT$/m;
-   $innodb_data{'ts'} = [ parse_innodb_timestamp( $time_text ) ];
+   my $time_text;
+   if ( $mysqlversion =~ /^5\.6/ ) {
+      ( $time_text ) = $fulltext =~ m/^([0-9-]* [0-9:]*) [0-9a-f]* INNODB MONITOR OUTPUT/m;
+      $innodb_data{'ts'} = [ parse_innodb_timestamp_56( $time_text ) ];
+   } else {
+      ( $time_text ) = $fulltext =~ m/^$s INNODB MONITOR OUTPUT$/m;
+      $innodb_data{'ts'} = [ parse_innodb_timestamp( $time_text ) ];
+   }
    $innodb_data{'timestring'} = ts_to_string($innodb_data{'ts'});
    ( $innodb_data{'last_secs'} ) = $fulltext
       =~ m/Per second averages calculated from the last $d seconds/;
@@ -133,6 +158,10 @@ sub parse_status_text {
    while ( my ( $start, $name, $text, $end ) = splice(@matches, 0, 4) ) {
       $innodb_sections{$name} = [ $text, $end ? 1 : 0 ];
    }
+   # The Row Operations section is a special case, because instead of ending
+   # with the beginning of another section, it ends with the end of the file.
+   # So this section is complete if the entire file is complete.
+   $innodb_sections{'ROW OPERATIONS'}->[1] ||= $innodb_data{'got_all'};
 
    # Just for sanity's sake, make sure I understand what to do with each
    # section.
@@ -178,7 +207,8 @@ sub parse_status_text {
                   $innodb_data{'sections'}->{$section},
                   $innodb_data{'sections'}->{$section}->{'complete'},
                   $debug,
-                  $full )
+                  $full,
+                  $mysqlversion)
                or delete $innodb_data{'sections'}->{$section};
          }
          else {
@@ -195,11 +225,11 @@ sub parse_status_text {
 
 # Parses the status text and returns it flattened out as a single hash.
 sub get_status_hash {
-   my ( $self, $fulltext, $debug, $sections, $full ) = @_;
+   my ( $self, $fulltext, $debug, $sections, $full, $mysqlversion ) = @_;
 
    # Parse the status text...
    my $innodb_status
-      = $self->parse_status_text($fulltext, $debug, $sections, $full );
+      = $self->parse_status_text($fulltext, $debug, $sections, $full, $mysqlversion );
 
    # Flatten the hierarchical structure into a single list by grabbing desired
    # sections from it.
@@ -250,7 +280,13 @@ sub ts_to_string {
    my $parts = shift;
    return sprintf('%02d-%02d-%02d %02d:%02d:%02d', @$parts);
 }
-
+sub parse_innodb_timestamp_56 {
+   my $text = shift;
+   my ( $y, $m, $d, $h, $i, $s )
+       = $text =~ m/^(\d\d\d\d)-(\d\d)-(\d\d) +(\d+):(\d+):(\d+)$/;
+   die("Can't get timestamp from $text\n") unless $y;
+   return ( $y, $m, $d, $h, $i, $s );
+}
 sub parse_innodb_timestamp {
    my $text = shift;
    my ( $y, $m, $d, $h, $i, $s )
@@ -261,13 +297,20 @@ sub parse_innodb_timestamp {
 }
 
 sub parse_fk_section {
-   my ( $section, $complete, $debug, $full ) = @_;
+   my ( $section, $complete, $debug, $full, $mysqlversion ) = @_;
    my $fulltext = $section->{'fulltext'};
 
    return 0 unless $fulltext;
 
-   my ( $ts, $type ) = $fulltext =~ m/^$s\s+(\w+)/m;
-   $section->{'ts'} = [ parse_innodb_timestamp( $ts ) ];
+   my ( $ts, $type );
+   if ( $mysqlversion =~ /^5.6/ ) {
+      ( $ts, $type ) = $fulltext =~ m/^([0-9-]* [0-9:]*)\s[0-9a-f]*\s+(\w+)/m;
+      $section->{'ts'} = [ parse_innodb_timestamp_56( $ts ) ];
+   } else {
+      ( $ts, $type ) = $fulltext =~ m/^$s\s+(\w+)/m;
+      $section->{'ts'} = [ parse_innodb_timestamp( $ts ) ];
+   }
+
    $section->{'timestring'} = ts_to_string($section->{'ts'});
    $section->{'type'} = $type;
 
@@ -1016,4 +1059,98 @@ sub _debug {
 
 1;
 
-# end_of_package InnoDBParser
+# end_of_package
+# ############################################################################
+# Perldoc section.  I put this last as per the Dog book.
+# ############################################################################
+=pod
+
+=head1 NAME
+
+InnoDBParser - Parse InnoDB monitor text.
+
+=head1 DESCRIPTION
+
+InnoDBParser tries to parse the output of the InnoDB monitor.  One way to get
+this output is to connect to a MySQL server and issue the command SHOW ENGINE
+INNODB STATUS (omit 'ENGINE' on earlier versions of MySQL).  The goal is to
+turn text into data that something else (e.g. innotop) can use.
+
+The output comes from all over, but the place to start in the source is
+innobase/srv/srv0srv.c.
+
+=head1 SYNOPSIS
+
+   use InnoDBParser;
+   use DBI;
+
+   # Get the status text.
+   my $dbh = DBI->connect(
+      "DBI::mysql:test;host=localhost",
+      'user',
+      'password'
+   );
+   my $query = 'SHOW /*!5 ENGINE */ INNODB STATUS';
+   my $text  = $dbh->selectcol_arrayref($query)->[0];
+
+   # 1 or 0
+   my $debug = 1;
+
+   # Choose sections of the monitor text you want.  Possible values:
+   # TRANSACTIONS                          => tx
+   # BUFFER POOL AND MEMORY                => bp
+   # SEMAPHORES                            => sm
+   # LOG                                   => lg
+   # ROW OPERATIONS                        => ro
+   # INSERT BUFFER AND ADAPTIVE HASH INDEX => ib
+   # FILE I/O                              => io
+   # LATEST DETECTED DEADLOCK              => dl
+   # LATEST FOREIGN KEY ERROR              => fk
+
+   my $required_sections = {
+      tx => 1,
+   };
+
+   # Parse the status text.
+   my $parser = InnoDBParser->new;
+   $innodb_status = $parser->parse_status_text(
+      $text,
+      $debug,
+      # Omit the following parameter to get all sections.
+      $required_sections,
+   );
+
+=head1 COPYRIGHT, LICENSE AND WARRANTY
+
+This package is copyright (c) 2006 Baron Schwartz, baron at xaprb dot com.
+Feedback and improvements are gratefully received.
+
+THIS PACKAGE IS PROVIDED "AS IS" AND WITHOUT ANY EXPRESS OR IMPLIED
+WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
+MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+
+This program is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, version 2; OR the Perl Artistic License.  On UNIX and similar
+systems, you can issue `man perlgpl' or `man perlartistic' to read these
+licenses.
+
+You should have received a copy of the GNU General Public License along with
+this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+Place, Suite 330, Boston, MA  02111-1307  USA
+
+=head1 AUTHOR
+
+Baron Schwartz, baron at xaprb dot com.
+
+=head1 BUGS
+
+None known, but I bet there are some.  The InnoDB monitor text wasn't really
+designed to be parsable.
+
+=head1 SEE ALSO
+
+innotop - a program that can format the parsed status information for humans
+to read and enjoy.
+
+=cut
