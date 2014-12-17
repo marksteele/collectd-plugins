@@ -1,7 +1,7 @@
 package Collectd::Plugin::MySQL;
 use Collectd qw(:all);
 use DBD::mysql;
-require '/usr/lib/collectd/Collectd/Plugins/InnoDBParser.pm';
+require InnoDBParser;
 
 =head1 NAME
 
@@ -23,7 +23,7 @@ This is a collectd plugin for monitoring a mysql server
 In your collectd config:
 
     <LoadPlugin "perl">
-    	Globals true
+       Globals true
     </LoadPlugin>
 
     <Plugin "perl">
@@ -125,7 +125,7 @@ $keys{'pstate'} = [qw(
 )];
 
 plugin_register (TYPE_READ, 'MySQL', 'my_read');
-plugin_register (TYPE_CONFIG, "MySQL", "mysql_config");
+plugin_register (TYPE_CONFIG, 'MySQL', 'mysql_config');
 
 sub mysql_config {
   my ($ci) = @_;
@@ -204,8 +204,10 @@ sub my_read {
   $status = { map { lc($_) => $status->{$_}} keys %{$status}};
   my $slave = $dbh->selectrow_hashref("SHOW SLAVE STATUS");
   $slave = {map { lc($_) => $slave->{$_}} keys %{$slave}};
+  my $sql = 'SELECT VERSION();';
+  my ($mysqlver) = $dbh->selectrow_array($sql);
   my $parser = InnoDBParser->new;
-  my $innodb_status = $parser->parse_status_text(read_innodb_status_from_file_or_sql( $dbh ),0,);
+  my $innodb_status = $parser->parse_status_text(read_innodb_status_from_file_or_sql( $dbh ), 0, undef, undef, $mysqlver);
   my $plist = $dbh->selectall_arrayref("SHOW PROCESSLIST", { Slice => {}});
   $dbh->disconnect();
 #  plugin_log(LOG_ERR, "MySQL: Done reading, submitting values");
