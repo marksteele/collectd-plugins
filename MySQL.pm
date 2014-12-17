@@ -90,7 +90,10 @@ $keys{'status'} = [qw(
     sort_merge_passes sort_range sort_rows sort_scan ssl_accept_renegotiates ssl_accepts ssl_callback_cache_hits ssl_cipher ssl_cipher_list ssl_client_connects ssl_connect_renegotiates ssl_ctx_verify_depth 
     ssl_ctx_verify_mode ssl_default_timeout ssl_finished_accepts ssl_finished_connects ssl_session_cache_hits ssl_session_cache_misses ssl_session_cache_mode ssl_session_cache_overflows 
     ssl_session_cache_size ssl_session_cache_timeouts ssl_sessions_reused ssl_used_session_cache_entries ssl_verify_depth ssl_verify_mode ssl_version table_locks_immediate table_locks_waited 
-    tc_log_max_pages_used tc_log_page_size tc_log_page_waits threads_cached threads_connected threads_created threads_running uptime uptime_since_flush_status
+    tc_log_max_pages_used tc_log_page_size tc_log_page_waits threads_cached threads_connected threads_created threads_running uptime uptime_since_flush_status 
+    wsrep_apply_oooe wsrep_apply_oool wsrep_causal_reads wsrep_commit_oooe wsrep_commit_oool wsrep_flow_control_recv wsrep_flow_control_sent wsrep_local_bf_aborts
+    wsrep_local_commits wsrep_local_replays wsrep_received wsrep_received_bytes wsrep_replicated wsrep_replicated_bytes 
+    wsrep_apply_window wsrep_cert_deps_distance wsrep_local_recv_queue wsrep_local_recv_queue_avg wsrep_local_send_queue wsrep_local_send_queue_avg wsrep_commit_window
 )]; 
 
 $keys{'slave'} = [qw(
