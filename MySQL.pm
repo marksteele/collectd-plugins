@@ -94,6 +94,9 @@ $keys{'status'} = [qw(
     wsrep_apply_oooe wsrep_apply_oool wsrep_causal_reads wsrep_commit_oooe wsrep_commit_oool wsrep_flow_control_recv wsrep_flow_control_sent wsrep_local_bf_aborts
     wsrep_local_commits wsrep_local_replays wsrep_received wsrep_received_bytes wsrep_replicated wsrep_replicated_bytes 
     wsrep_apply_window wsrep_cert_deps_distance wsrep_local_recv_queue wsrep_local_recv_queue_avg wsrep_local_send_queue wsrep_local_send_queue_avg wsrep_commit_window
+    wsrep_local_cert_failures wsrep_cert_index_size wsrep_local_state wsrep_flow_control_paused wsrep_cluster_size wsrep_last_committed
+    innodb_buffer_pool_bytes_data threadpool_idle_threads wsrep_thread_count innodb_descriptors_memory innodb_read_views_memory innodb_buffer_pool_bytes_dirty
+    threadpool_threads
 )]; 
 
 $keys{'slave'} = [qw(
@@ -123,8 +126,11 @@ $keys{'pstate'} = [qw(
   after_create analyzing checking_permissions checking_table cleaning_up closing_tables converting_heap_to_myisam copy_to_tmp_table copying_to_tmp_table_on_disk creating_index creating_sort_index
   copying_to_group_table creating_table creating_tmp_table deleting_from_main_table deleting_from_reference_table discard_or_import_tablespace end executing execution_of_init_command freeing_items
   flushing_tables fulltext_initialization init killed locked logging_slow_query null manage_keys opening_table optimizing preparing purging_old_relay_logs query_end reading_from_net removing_duplicates
-  removing_tmp_table rename rename_result_table reopen_tables repair_by_sorting repair_done repair_with_keycache rolling_back saving_state searching_rows_for_update sending_data setup sorting_for_group
-  sorting_for_order sorting_index sorting_result statistics system_lock updating updating_main_table updating_reference_tables user_lock user_sleep waiting_for_table waiting_on_cond writing_to_net
+  removing_tmp_table rename rename_result_table reopen_tables repair_by_sorting repair_done repair_with_keycache rolling_back 
+  saving_state searching_rows_for_update sending_data setup sleep sorting_for_group sorting_for_order sorting_index sorting_result statistics system_lock 
+  updating updating_main_table updating_reference_tables user_lock user_
+  waiting_for_table waiting_on_cond writing_to_net wsrep
+  other
 )];
 
 plugin_register (TYPE_READ, 'MySQL', 'my_read');
@@ -218,35 +224,52 @@ sub my_read {
   my %states;
   foreach my $item (@{$plist}) {
     if ($item->{'State'}) {
-      $item->{'State'} =~ s/^(?:Table lock|Waiting.*lock)$/locked/;
-      $item->{'State'} =~ s/^Opening tables/opening table/;
-      $item->{'State'} =~ s/^Waiting for tables/waiting_for_table/;
-      $item->{'State'} =~ s/^(.+?);.*/$1/;
-      $item->{'State'} =~ s/[^a-zA-Z0-9_]/_/g;
-      $states{lc($item->{'State'})}++;
+      my $state = $item->{'State'};
+      $state =~ s/^(?:Table lock|Waiting.*lock)$/locked/;
+      $state =~ s/^Opening tables/opening table/;
+      $state =~ s/^Waiting for tables/waiting_for_table/;
+      $state =~ s/^(.+?);.*/$1/;
+      $state =~ s/[^a-zA-Z0-9_]/_/g;
+      $state =~ s/^Sleeping.*/sleep/i;
+      $state =~ s/^update.*/updating/i;
+      $state =~ s/^wsrep_aborter_idle.*/wsrep/i;
+
+      if( grep $_ eq $state, @{$keys{'pstate'}} ){
+          $states{lc($state)}++;
+      }else{
+          $states{'other'}++;
+          plugin_log(LOG_WARNING, "MySQL: Unknown pstate: '$state'");
+      }
     } else {
       $states{'null'}++;
     }
   }
 
-  for (@{$keys{'status'}}) {
+  my $key;
+  for $key (keys %{$status}) {
+
+    unless (grep $_ eq $key, @{$keys{'status'}}){
+#       plugin_log(LOG_INFO, "MySQL: variable '$key' is not monitored");
+       next;
+    }
+
     my $vl = {};
     $vl->{'plugin'} = 'mysql';
     $vl->{'type'} = 'counter';
     $vl->{'plugin_instance'} = 'status';
-    $vl->{'type_instance'} =  $_;
-    if (defined($status->{$_}->{'Value'})) {
-      if ($status->{$_}->{'Value'} =~ /^\d+(\.\d+)?$/) {
-        $vl->{'values'} = [  $status->{$_}->{'Value'} + 0 ];
+    $vl->{'type_instance'} =  $key;
+    $vl->{'values'} = [ 0 ];
+
+    if (defined($status->{$key}->{'Value'})) {
+      if ($status->{$jey}->{'Value'} =~ /^\d+(\.\d+)?$/) {
+        $vl->{'values'} = [  $status->{$key}->{'Value'} + 0 ];
       } else {
-        if ($status->{$_}->{'Value'} =~ /(?:yes|on|enabled)/i) {
+        if ($status->{$key}->{'Value'} =~ /(?:yes|on|enabled)/i) {
           $vl->{'values'} = [ 1 ];
         } else {
           $vl->{'values'} = [ 0 ];
         }
       }
-    } else {
-      $vl->{'values'} = [ 0 ];
     }
     plugin_dispatch_values($vl);  
   }
