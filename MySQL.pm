@@ -236,8 +236,14 @@ sub my_read {
       $pstate =~ s/^(?:table lock|taiting.*lock)$/locked/;
       $pstate =~ s/^opening tables/opening table/;
       $pstate =~ s/^waiting for tables/waiting_for_table/;
+      $pstate =~ s/^Sleeping.*/sleep/i;
+      $pstate =~ s/^update.*/updating/i;
+      $pstate =~ s/^write_rows_log_event__write_row.*/wsrep_write_row/i;
+      $pstate =~ s/^committed_.*/wsrep_commit/i;
+      $pstate =~ s/^wsrep_aborter_idle.*/wsrep/i;
       $pstate =~ s/^(.+?);.*/$1/;
       $pstate =~ s/[^a-zA-Z0-9_]/_/g;
+
       if (exists $keys{'plist'}{$pstate}) {
         $states{$pstate}++;
       } else {
