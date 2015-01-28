@@ -129,7 +129,7 @@ $keys{'pstate'} = [qw(
   removing_tmp_table rename rename_result_table reopen_tables repair_by_sorting repair_done repair_with_keycache rolling_back 
   saving_state searching_rows_for_update sending_data setup sleep sorting_for_group sorting_for_order sorting_index sorting_result statistics system_lock 
   updating updating_main_table updating_reference_tables user_lock user_
-  waiting_for_table waiting_on_cond writing_to_net wsrep
+  waiting_for_table waiting_on_cond writing_to_net wsrep wsrep_commit wsrep_write_row
   other
 )];
 
@@ -232,6 +232,8 @@ sub my_read {
       $state =~ s/[^a-zA-Z0-9_]/_/g;
       $state =~ s/^Sleeping.*/sleep/i;
       $state =~ s/^update.*/updating/i;
+      $state =~ s/^Write_rows_log_event__write_row.*/wsrep_write_row/i;
+      $state =~ s/^committed_.*/wsrep_commit/i;
       $state =~ s/^wsrep_aborter_idle.*/wsrep/i;
 
       if( grep $_ eq $state, @{$keys{'pstate'}} ){
@@ -261,7 +263,7 @@ sub my_read {
     $vl->{'values'} = [ 0 ];
 
     if (defined($status->{$key}->{'Value'})) {
-      if ($status->{$jey}->{'Value'} =~ /^\d+(\.\d+)?$/) {
+      if ($status->{$key}->{'Value'} =~ /^\d+(\.\d+)?$/) {
         $vl->{'values'} = [  $status->{$key}->{'Value'} + 0 ];
       } else {
         if ($status->{$key}->{'Value'} =~ /(?:yes|on|enabled)/i) {
