@@ -50,7 +50,7 @@ my $user = 'root';
 my $pass = '';
 
 my %keys = ();
-$keys{'status'} = [qw(
+my @status_keys = qw(
     aborted_clients aborted_connects binlog_cache_disk_use binlog_cache_use binlog_commits binlog_group_commits binlog_stmt_cache_disk_use binlog_stmt_cache_use bytes_received bytes_sent 
     com_admin_commands com_alter_db com_alter_db_upgrade com_alter_event com_alter_function com_alter_procedure com_alter_server com_alter_table com_alter_tablespace com_analyze com_assign_to_keycache 
     com_begin com_binlog com_call_procedure com_change_db com_change_master com_check com_checksum com_commit com_create_db com_create_event com_create_function com_create_index com_create_procedure 
@@ -94,38 +94,54 @@ $keys{'status'} = [qw(
     wsrep_apply_oooe wsrep_apply_oool wsrep_causal_reads wsrep_commit_oooe wsrep_commit_oool wsrep_flow_control_recv wsrep_flow_control_sent wsrep_local_bf_aborts
     wsrep_local_commits wsrep_local_replays wsrep_received wsrep_received_bytes wsrep_replicated wsrep_replicated_bytes 
     wsrep_apply_window wsrep_cert_deps_distance wsrep_local_recv_queue wsrep_local_recv_queue_avg wsrep_local_send_queue wsrep_local_send_queue_avg wsrep_commit_window
-)]; 
+    wsrep_local_cert_failures wsrep_cert_index_size wsrep_local_state wsrep_flow_control_paused wsrep_cluster_size wsrep_last_committed
+    innodb_buffer_pool_bytes_data threadpool_idle_threads wsrep_thread_count innodb_descriptors_memory innodb_read_views_memory innodb_buffer_pool_bytes_dirty
+    threadpool_threads
+); 
 
-$keys{'slave'} = [qw(
-    exec_master_log_pos read_master_log_pos seconds_behind_master slave_io_running slave_sql_running
-)];
 
-$keys{'innodb'}{'bp'} = [qw(
+my @slave_keys = qw(exec_master_log_pos read_master_log_pos seconds_behind_master slave_io_running slave_sql_running);
+
+my @innodb_bp_keys = qw(
       add_pool_alloc awe_mem_alloc buf_free buf_pool_hits buf_pool_reads buf_pool_size dict_mem_alloc page_creates_sec page_reads_sec page_writes_sec pages_created pages_modified 
       pages_read pages_total pages_written reads_pending total_mem_alloc writes_pending writes_pending_flush_list writes_pending_lru writes_pending_single_page
-)]; 
+); 
 
-$keys{'innodb'}{'ib'} = [qw(
+my @innodb_ib_keys = qw(
     bufs_in_node_heap free_list_len hash_searches_s hash_table_size inserts merged_recs merges non_hash_searches_s seg_size size used_cells
-)]; 
+); 
 
-$keys{'innodb'}{'io'} = [qw(
+my @innodb_io_keys = qw(
     avg_bytes_s flush_type fsyncs_s os_file_reads os_file_writes os_fsyncs pending_aio_writes pending_buffer_pool_flushes pending_ibuf_aio_reads pending_log_flushes pending_log_ios 
     pending_normal_aio_reads pending_preads pending_pwrites pending_sync_ios reads_s writes_s
-)];
+);
 
-$keys{'innodb'}{'lg'} = [qw(last_chkp log_flushed_to log_ios_done log_ios_s log_seq_no pending_chkp_writes pending_log_writes)];
-$keys{'innodb'}{'ro'} = [qw(del_sec ins_sec n_reserved_extents num_rows_del num_rows_ins num_rows_read num_rows_upd queries_in_queue queries_inside read_sec read_views_open upd_sec)];
-$keys{'innodb'}{'sm'} = [qw(mutex_os_waits mutex_spin_rounds mutex_spin_waits reservation_count rw_excl_os_waits rw_excl_spins rw_shared_os_waits rw_shared_spins signal_count wait_array_size)];
+my @innodb_lg_keys = qw(last_chkp log_flushed_to log_ios_done log_ios_s log_seq_no pending_chkp_writes pending_log_writes);
 
+my @innodb_ro_keys = qw(del_sec ins_sec n_reserved_extents num_rows_del num_rows_ins num_rows_read num_rows_upd queries_in_queue queries_inside read_sec read_views_open upd_sec);
 
-$keys{'pstate'} = [qw(
+my @innodb_sm_keys = qw(mutex_os_waits mutex_spin_rounds mutex_spin_waits reservation_count rw_excl_os_waits rw_excl_spins rw_shared_os_waits rw_shared_spins signal_count wait_array_size);
+
+my @pstate_keys = qw(
   after_create analyzing checking_permissions checking_table cleaning_up closing_tables converting_heap_to_myisam copy_to_tmp_table copying_to_tmp_table_on_disk creating_index creating_sort_index
   copying_to_group_table creating_table creating_tmp_table deleting_from_main_table deleting_from_reference_table discard_or_import_tablespace end executing execution_of_init_command freeing_items
   flushing_tables fulltext_initialization init killed locked logging_slow_query null manage_keys opening_table optimizing preparing purging_old_relay_logs query_end reading_from_net removing_duplicates
-  removing_tmp_table rename rename_result_table reopen_tables repair_by_sorting repair_done repair_with_keycache rolling_back saving_state searching_rows_for_update sending_data setup sorting_for_group
-  sorting_for_order sorting_index sorting_result statistics system_lock updating updating_main_table updating_reference_tables user_lock user_sleep waiting_for_table waiting_on_cond writing_to_net
-)];
+  removing_tmp_table rename rename_result_table reopen_tables repair_by_sorting repair_done repair_with_keycache rolling_back 
+  saving_state searching_rows_for_update sending_data setup sleep sorting_for_group sorting_for_order sorting_index sorting_result statistics system_lock 
+  updating updating_main_table updating_reference_tables user_lock user_
+  waiting_for_table waiting_on_cond writing_to_net wsrep wsrep_commit wsrep_write_row
+  other
+);
+
+@{$keys{'status'}}{@status_keys} = undef;
+@{$keys{'slave'}}{@slave_keys} = undef; 
+@{$keys{'innodb'}{'bp'}}{@innodb_bp_keys} = undef;
+@{$keys{'innodb'}{'ib'}}{@innodb_ib_keys} = undef;
+@{$keys{'innodb'}{'io'}}{@innodb_io_keys} = undef;
+@{$keys{'innodb'}{'lg'}}{@innodb_lg_keys} = undef;
+@{$keys{'innodb'}{'ro'}}{@innodb_ro_keys} = undef;
+@{$keys{'innodb'}{'sm'}}{@innodb_sm_keys} = undef;
+@{$keys{'pstate'}}{@pstate_keys} = undef; 
 
 plugin_register (TYPE_READ, 'MySQL', 'my_read');
 plugin_register (TYPE_CONFIG, 'MySQL', 'mysql_config');
@@ -201,7 +217,6 @@ sub read_innodb_status_from_file_or_sql {
 
 
 sub my_read {
-#  plugin_log(LOG_ERR, "MySQL: reading values");
   my $dbh = DBI->connect("DBI:mysql:database=mysql;host=$host;port=$port", $user, $pass) || return 0;
   my $status = $dbh->selectall_hashref("SHOW /*!50002 GLOBAL */ STATUS",'Variable_name');
   $status = { map { lc($_) => $status->{$_}} keys %{$status}};
@@ -213,23 +228,27 @@ sub my_read {
   my $innodb_status = $parser->parse_status_text(read_innodb_status_from_file_or_sql( $dbh ), 0, undef, undef, $mysqlver);
   my $plist = $dbh->selectall_arrayref("SHOW PROCESSLIST", { Slice => {}});
   $dbh->disconnect();
-#  plugin_log(LOG_ERR, "MySQL: Done reading, submitting values");
 
   my %states;
   foreach my $item (@{$plist}) {
     if ($item->{'State'}) {
-      $item->{'State'} =~ s/^(?:Table lock|Waiting.*lock)$/locked/;
-      $item->{'State'} =~ s/^Opening tables/opening table/;
-      $item->{'State'} =~ s/^Waiting for tables/waiting_for_table/;
-      $item->{'State'} =~ s/^(.+?);.*/$1/;
-      $item->{'State'} =~ s/[^a-zA-Z0-9_]/_/g;
-      $states{lc($item->{'State'})}++;
+      my $pstate = lc($item->{'State'});
+      $pstate =~ s/^(?:table lock|taiting.*lock)$/locked/;
+      $pstate =~ s/^opening tables/opening table/;
+      $pstate =~ s/^waiting for tables/waiting_for_table/;
+      $pstate =~ s/^(.+?);.*/$1/;
+      $pstate =~ s/[^a-zA-Z0-9_]/_/g;
+      if (exists $keys{'plist'}{$pstate}) {
+        $states{$pstate}++;
+      } else {
+        plugin_log(LOG_WARNING, "MySQL: Unknown pstate: '$pstate'");
+      }
     } else {
       $states{'null'}++;
     }
   }
 
-  for (@{$keys{'status'}}) {
+  for (keys %{$keys{'status'}}) {
     my $vl = {};
     $vl->{'plugin'} = 'mysql';
     $vl->{'type'} = 'counter';
@@ -251,7 +270,7 @@ sub my_read {
     plugin_dispatch_values($vl);  
   }
 
-  for (@{$keys{'slave'}}) {
+  for (keys %{$keys{'slave'}}) {
     my $vl = {};
     $vl->{'plugin'} = 'mysql';
     $vl->{'type'} = 'counter';
@@ -291,7 +310,7 @@ sub my_read {
     $vl->{'plugin'} = 'mysql';
     $vl->{'type'} = 'counter';
     $vl->{'plugin_instance'} = 'innodb';
-    foreach my $item (@{$keys{'innodb'}{$section}}) {
+    foreach my $item (keys %{$keys{'innodb'}{$section}}) {
       $vl->{'type_instance'} =  $section . '_' . $item;
       if ($innodb_status->{'sections'}->{$section}->{$item} =~ /^\d+(?:\.\d+)?$/) {
         $vl->{'values'} = [ $innodb_status->{'sections'}->{$section}->{$item} + 0];
@@ -306,7 +325,7 @@ sub my_read {
     }
   }
 
-  foreach my $item (@{$keys{'pstate'}}) {
+  foreach my $item (keys %{$keys{'pstate'}}) {
     my $vl = {};
     $vl->{'plugin'} = 'mysql';
     $vl->{'type'} = 'counter';
