@@ -31,9 +31,14 @@ In your collectd config:
       LoadPlugin "MySQL"
 
       <Plugin "MySQL">
-        <Database db_name>
+        <Database db_a>
           Host "localhost"
           Port "3306"
+          User "root"
+          Pass "mypass"
+        </Database>
+        <Database db_b>
+          Socket "/var/mysql/mysql.sock"
           User "root"
           Pass "mypass"
         </Database>
@@ -151,6 +156,7 @@ sub mysql_config {
     my $db_name = $database->{'values'}->[0];
     my $host = 'localhost';
     my $port = 3306;
+    my $socket = '';
     my $user = 'root';
     my $pass = '';
     foreach my $item (@{$database->{'children'}}) {
@@ -162,6 +168,8 @@ sub mysql_config {
         $host = $val;
       } elsif ($key eq 'port' ) {
         $port = $val;
+      } elsif ($key eq 'socket' ) {
+        $socket = $val;
       } elsif ($key eq 'user') {
         $user = $val;
       } elsif ($key eq 'pass') {
@@ -170,6 +178,7 @@ sub mysql_config {
     }
     $databases->{$db_name}->{'host'} = $host;
     $databases->{$db_name}->{'port'} = $port;
+    $databases->{$db_name}->{'socket'} = $socket;
     $databases->{$db_name}->{'user'} = $user;
     $databases->{$db_name}->{'pass'} = $pass;
   }
@@ -239,10 +248,17 @@ sub my_read_each_db {
   my $database = shift(@_);
   my $host = $database->{'host'};
   my $port = $database->{'port'};
+  my $socket = $database->{'socket'};
   my $user = $database->{'user'};
   my $pass = $database->{'pass'};
 
-  my $dbh = DBI->connect("DBI:mysql:database=mysql;host=$host;port=$port", $user, $pass) || return 0;
+  my $dbh;
+  if ($socket eq "") {
+      $dbh = DBI->connect("DBI:mysql:database=mysql;host=$host;port=$port", $user, $pass) || return 0;
+  } else {
+      $dbh = DBI->connect("DBI:mysql:database=mysql;mysql_socket=$socket", $user, $pass) || return 0;
+  }
+
   my $status = $dbh->selectall_hashref("SHOW /*!50002 GLOBAL */ STATUS",'Variable_name');
   $status = { map { lc($_) => $status->{$_}} keys %{$status}};
   my $slave = $dbh->selectrow_hashref("SHOW SLAVE STATUS");
