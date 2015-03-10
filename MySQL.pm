@@ -257,7 +257,7 @@ sub my_read {
   for (keys %{$keys{'status'}}) {
     my $vl = {};
     $vl->{'plugin'} = 'mysql';
-    $vl->{'type'} = 'counter';
+    $vl->{'type'} = 'gauge';
     $vl->{'plugin_instance'} = 'status';
     $vl->{'type_instance'} =  $_;
     if (defined($status->{$_}->{'Value'})) {
@@ -279,7 +279,7 @@ sub my_read {
   for (keys %{$keys{'slave'}}) {
     my $vl = {};
     $vl->{'plugin'} = 'mysql';
-    $vl->{'type'} = 'counter';
+    $vl->{'type'} = 'gauge';
     $vl->{'plugin_instance'} = 'slave';
     $vl->{'type_instance'} =  $_;
     if (defined($slave->{$_})) {
@@ -300,7 +300,7 @@ sub my_read {
 
   my $vl = {};
   $vl->{'plugin'} = 'mysql';
-  $vl->{'type'} = 'counter';
+  $vl->{'type'} = 'gauge';
   $vl->{'plugin_instance'} = 'slave';
   $vl->{'type_instance'} =  'binlog_synched_to_master';
 
@@ -314,7 +314,7 @@ sub my_read {
   foreach my $section (keys %{$keys{'innodb'}}) {
     my $vl = {};
     $vl->{'plugin'} = 'mysql';
-    $vl->{'type'} = 'counter';
+    $vl->{'type'} = 'gauge';
     $vl->{'plugin_instance'} = 'innodb';
     foreach my $item (keys %{$keys{'innodb'}{$section}}) {
       $vl->{'type_instance'} =  $section . '_' . $item;
@@ -334,7 +334,7 @@ sub my_read {
   foreach my $item (keys %{$keys{'pstate'}}) {
     my $vl = {};
     $vl->{'plugin'} = 'mysql';
-    $vl->{'type'} = 'counter';
+    $vl->{'type'} = 'gauge';
     $vl->{'plugin_instance'} = 'process';
     $vl->{'type_instance'} =  $item;
     if (defined($states{$item})) {
