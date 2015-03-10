@@ -30,11 +30,13 @@ In your collectd config:
       BaseName "Collectd::Plugins"
       LoadPlugin "MySQL"
 
-     <Plugin "MySQL">
-       Host "localhost"
-       Port "3306"
-       User "root"
-       Pass "mypass"
+      <Plugin "MySQL">
+        <Database db_name>
+          Host "localhost"
+          Port "3306"
+          User "root"
+          Pass "mypass"
+        </Database>
       </Plugin>
     </Plugin>
 
@@ -44,10 +46,7 @@ Mark Steele, C<< <mark at control-alt-del.org> >>
     
 =cut
 
-my $host = 'localhost';
-my $port = 3306;
-my $user = 'root';
-my $pass = '';
+my $databases = {};
 
 my %keys = ();
 my @status_keys = qw(
@@ -148,18 +147,31 @@ plugin_register (TYPE_CONFIG, 'MySQL', 'mysql_config');
 
 sub mysql_config {
   my ($ci) = @_;
-  foreach my $item (@{$ci->{'children'}}) {
-    my $key = lc($item->{'key'});
-    my $val = $item->{'values'}->[0];
-    if ($key eq 'host' ) {
-      $host = $val;
-     } elsif ($key eq 'port' ) {
-       $port = $val;
-     } elsif ($key eq 'user') {
+  foreach my $database (@{$ci->{'children'}}) {
+    my $db_name = $database->{'values'}->[0];
+    my $host = 'localhost';
+    my $port = 3306;
+    my $user = 'root';
+    my $pass = '';
+    foreach my $item (@{$database->{'children'}}) {
+      my $key = lc($item->{'key'});
+      my $val = $item->{'values'}->[0];
+
+
+      if ($key eq 'host' ) {
+        $host = $val;
+      } elsif ($key eq 'port' ) {
+        $port = $val;
+      } elsif ($key eq 'user') {
         $user = $val;
-     } elsif ($key eq 'pass') {
-         $pass = $val;
-     }
+      } elsif ($key eq 'pass') {
+        $pass = $val;
+      }
+    }
+    $databases->{$db_name}->{'host'} = $host;
+    $databases->{$db_name}->{'port'} = $port;
+    $databases->{$db_name}->{'user'} = $user;
+    $databases->{$db_name}->{'pass'} = $pass;
   }
   return 1;
 }
@@ -215,8 +227,21 @@ sub read_innodb_status_from_file_or_sql {
   return $innodb_status_fulltext;
 }
 
-
 sub my_read {
+  foreach my $db_name (keys %{$databases}) {
+    my_read_each_db($db_name, $databases->{$db_name});
+  }
+  1;
+}
+
+sub my_read_each_db {
+  my $db_name = shift(@_);
+  my $database = shift(@_);
+  my $host = $database->{'host'};
+  my $port = $database->{'port'};
+  my $user = $database->{'user'};
+  my $pass = $database->{'pass'};
+
   my $dbh = DBI->connect("DBI:mysql:database=mysql;host=$host;port=$port", $user, $pass) || return 0;
   my $status = $dbh->selectall_hashref("SHOW /*!50002 GLOBAL */ STATUS",'Variable_name');
   $status = { map { lc($_) => $status->{$_}} keys %{$status}};
@@ -258,7 +283,7 @@ sub my_read {
     my $vl = {};
     $vl->{'plugin'} = 'mysql';
     $vl->{'type'} = 'counter';
-    $vl->{'plugin_instance'} = 'status';
+    $vl->{'plugin_instance'} = "status-$db_name";
     $vl->{'type_instance'} =  $_;
     if (defined($status->{$_}->{'Value'})) {
       if ($status->{$_}->{'Value'} =~ /^\d+(\.\d+)?$/) {
@@ -280,7 +305,7 @@ sub my_read {
     my $vl = {};
     $vl->{'plugin'} = 'mysql';
     $vl->{'type'} = 'counter';
-    $vl->{'plugin_instance'} = 'slave';
+    $vl->{'plugin_instance'} = "slave-$db_name";
     $vl->{'type_instance'} =  $_;
     if (defined($slave->{$_})) {
       if ($slave->{$_} =~ /^\d+(?:\.\d+)?$/) {
@@ -301,7 +326,7 @@ sub my_read {
   my $vl = {};
   $vl->{'plugin'} = 'mysql';
   $vl->{'type'} = 'counter';
-  $vl->{'plugin_instance'} = 'slave';
+  $vl->{'plugin_instance'} = "slave-$db_name";
   $vl->{'type_instance'} =  'binlog_synched_to_master';
 
   if ($slave->{'Master_Log_File'} eq $slave->{'Relay_Master_Log_File'}) { ## Slave processing same binlog as master
@@ -315,7 +340,7 @@ sub my_read {
     my $vl = {};
     $vl->{'plugin'} = 'mysql';
     $vl->{'type'} = 'counter';
-    $vl->{'plugin_instance'} = 'innodb';
+    $vl->{'plugin_instance'} = "innodb-$db_name";
     foreach my $item (keys %{$keys{'innodb'}{$section}}) {
       $vl->{'type_instance'} =  $section . '_' . $item;
       if ($innodb_status->{'sections'}->{$section}->{$item} =~ /^\d+(?:\.\d+)?$/) {
@@ -335,7 +360,7 @@ sub my_read {
     my $vl = {};
     $vl->{'plugin'} = 'mysql';
     $vl->{'type'} = 'counter';
-    $vl->{'plugin_instance'} = 'process';
+    $vl->{'plugin_instance'} = "process-$db_name";
     $vl->{'type_instance'} =  $item;
     if (defined($states{$item})) {
       $vl->{'values'} = [ $states{$item} + 0];
