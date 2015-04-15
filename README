@@ -56,21 +56,27 @@ MySQL
 In your collectd config:
 
     <LoadPlugin "perl">
-        Globals true
+       Globals true
     </LoadPlugin>
-
+    
     <Plugin "perl">
       BaseName "Collectd::Plugins"
       LoadPlugin "MySQL"
-
-     <Plugin "MySQL">
-       Host "localhost"
-       Port "3306"
-       User "root"
-       Pass "mypass"
+      
+      <Plugin "MySQL">
+        <Database db_a>
+          Host "localhost"
+          Port "3306"
+          User "root"
+          Pass "mypass"
+        </Database>
+        <Database db_b>
+          Socket "/var/mysql/mysql.sock"
+          User "root"
+          Pass "mypass"
+        </Database>
       </Plugin>
     </Plugin>
-
 
 This plugin gathers about 500 metrics from the MySQL server. Specifically the following variables are gathered:
 
