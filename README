@@ -1,3 +1,10 @@
+CloudWatchMetrics: Writes metrics to CloudWatch.
+
+Beware metric costs, at 0.50$ per metric you want to make sure you're using match filters to only send what you really want to pay for.
+
+
+--
+
 AmqpGraphite collectd perl plugin: Writes to AMQP with metrics in graphite format.
 
 --
